@@ -34,6 +34,7 @@ async function run() {
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     const menuCollection = client.db('bistro-boss-db').collection('menu');
+    const cartCollection = client.db('bistro-boss-db').collection('carts');
 
     app.get('/menu',async(req,res)=>{
         const cursor = menuCollection.find();
@@ -41,6 +42,31 @@ async function run() {
 
         res.send(result);
     })
+
+    // add to cart
+    app.post('/carts',async(req,res)=>{
+      try {
+        const cart = req.body;
+        const result = await cartCollection.insertOne(cart);
+        res.send(result);
+      } catch (error) {
+        console.log("something went wrong when adding to cart",error);
+      }
+    })
+
+    // get cart
+    app.get('/carts',async(req,res)=>{
+      try {
+        const cursor = cartCollection.find();
+        const result = await cursor.toArray();
+        res.send(result);
+      } catch (error) {
+        console.log("something went wrong when getting cart",error);
+      }
+
+    })
+
+
 
 
   } finally {
