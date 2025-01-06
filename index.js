@@ -1,6 +1,7 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const { configDotenv } = require('dotenv');
 configDotenv();
 
@@ -35,6 +36,50 @@ async function run() {
 
     const menuCollection = client.db('bistro-boss-db').collection('menu');
     const cartCollection = client.db('bistro-boss-db').collection('carts');
+    const userCollection = client.db('bistro-boss-db').collection('users');
+
+    // user related api
+    app.post('/users',async(req,res)=>{
+      const user = req.body;
+      // insert email if user desn't exists;
+      // you can  do this many ways (1. email unique,2. upsert, 3. simple checkin in db);
+      const query = {email: user.email};
+      const existingUser = await userCollection.findOne(query);
+      if(existingUser){
+        return res.send({message: "User already exist.",innsertedId: null});
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    })
+
+    app.get('/users',async(req,res)=>{
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    })
+
+    app.patch('/users/admin/:id',async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const updatedDocs = {
+        $set: {
+          role: "admin"
+        }
+      };
+
+      const result = await userCollection.updateOne(query,updatedDocs);
+      res.send(result);
+    })
+
+    // delete user
+    app.delete('/users/:id',async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = userCollection.deleteOne(query);
+
+      res.send(result);
+    })
+
+    // menu api
 
     app.get('/menu',async(req,res)=>{
         const cursor = menuCollection.find();
@@ -66,6 +111,15 @@ async function run() {
         console.log("something went wrong when getting cart",error);
       }
 
+    })
+
+    // delete carts
+    app.delete('/carts/:id',async(req,res)=>{
+      const id = req.params.id;
+      console.log(id);
+      const filter = {_id: new ObjectId(id)};
+      const result = await cartCollection.deleteOne(filter);
+      res.send(result);
     })
 
 
