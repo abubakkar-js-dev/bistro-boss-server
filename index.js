@@ -38,6 +38,15 @@ async function run() {
     const cartCollection = client.db('bistro-boss-db').collection('carts');
     const userCollection = client.db('bistro-boss-db').collection('users');
 
+
+    // jwt related api
+    app.post('/jwt',async(req,res)=>{
+      const user = req.body;
+      const token = jwt.sign(user,process.env.JWT_SECRET,{expiresIn: '1h'});
+      res.send({token});
+
+    })
+
     // user related api
     app.post('/users',async(req,res)=>{
       const user = req.body;
@@ -52,12 +61,54 @@ async function run() {
       res.send(result);
     })
 
-    app.get('/users',async(req,res)=>{
+    // custom middleware to verify the token
+
+    const verifyToken = (req,res,next)=>{
+      console.log("inside the verify token",req.headers);
+        if(!req.headers.authorization){
+          return res.status(401).send({message: "forbiddedn access"})
+        }
+        const token = req.headers.authorization.split(" ")[1];
+        jwt.verify(token,process.env.JWT_SECRET,(error,decoded)=>{
+          if(error){
+            return res.status(401).send({message: "Forbidden access"});
+          }
+          req.decoded = decoded;
+        })
+      next();
+    }
+
+
+    // verify admin
+    const verifyAdmin = async(req,res,next)=>{
+      const email = req.decoded.email;
+      const query = {email: email};
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if(!isAdmin){
+        return res.status(403).send({message:"Forbidden access"});
+      }
+      next();
+    }
+
+    app.get('/users',verifyToken,verifyAdmin,async(req,res)=>{
+      console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
     })
 
-    app.patch('/users/admin/:id',async(req,res)=>{
+    // check if user is admin
+    app.get('/users/admin/:email',verifyToken,async(req,res)=>{
+      const email = req.params.email;
+      if(req.decoded.email !== email){
+        return res.status(403).send({message:"Forbidden access"});
+      }
+      const query = {email: email};
+      const user = await userCollection.findOne(query);
+      res.send({isAdmin: user?.role === "admin"});
+    })
+
+    app.patch('/users/admin/:id',verifyToken,verifyAdmin,async(req,res)=>{
       const id = req.params.id;
       const query = {_id: new ObjectId(id)};
       const updatedDocs = {
