@@ -139,9 +139,38 @@ async function run() {
         res.send(result);
     })
 
+    app.get("/menu/:id",async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: id};
+      const result = await menuCollection.findOne(query);
+      res.send(result);
+    })
+
     app.post('/menu',verifyToken,verifyAdmin,async(req,res)=>{
       const item = req.body;
       const result = await menuCollection.insertOne(item);
+      res.send(result);
+    })
+
+    // delete menu
+    app.delete('/menu/:id',verifyToken,verifyAdmin,async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: id};
+      const result = await menuCollection.deleteOne(query);
+      res.send(result);
+    })
+
+    // update menu
+    app.patch('/menu/:id',verifyToken,verifyAdmin,async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: id};
+      const updatedItem = req.body;
+      const updatedDocs = {
+        $set: {
+          ...updatedItem
+        }
+      }
+      const result = await menuCollection.updateOne(query,updatedDocs);
       res.send(result);
     })
 
