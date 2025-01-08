@@ -64,7 +64,7 @@ async function run() {
     // custom middleware to verify the token
 
     const verifyToken = (req,res,next)=>{
-      console.log("inside the verify token",req.headers);
+      // console.log("inside the verify token",req.headers);
         if(!req.headers.authorization){
           return res.status(401).send({message: "forbiddedn access"})
         }
@@ -92,7 +92,7 @@ async function run() {
     }
 
     app.get('/users',verifyToken,verifyAdmin,async(req,res)=>{
-      console.log(req.headers);
+      // console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
     })
@@ -137,6 +137,12 @@ async function run() {
         const result = await cursor.toArray();
 
         res.send(result);
+    })
+
+    app.post('/menu',verifyToken,verifyAdmin,async(req,res)=>{
+      const item = req.body;
+      const result = await menuCollection.insertOne(item);
+      res.send(result);
     })
 
     // add to cart
