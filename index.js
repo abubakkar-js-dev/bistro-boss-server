@@ -37,7 +37,9 @@ async function run() {
     const menuCollection = client.db("bistro-boss-db").collection("menu");
     const cartCollection = client.db("bistro-boss-db").collection("carts");
     const userCollection = client.db("bistro-boss-db").collection("users");
-    const paymentCollection = client.db("bistro-boss-db").collection("payments");
+    const paymentCollection = client
+      .db("bistro-boss-db")
+      .collection("payments");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -209,45 +211,120 @@ async function run() {
       const result = await cartCollection.deleteOne(filter);
       res.send(result);
     });
-  // payment related api
+    // payment related api
 
-  app.get('/payments',verifyToken,async(req,res)=>{
-    const email = req.query.email;
-    const query = {email:email};
-    if(req.decoded.email !== email){
-    return res.status(403).send({message:"Forbidden access"});
-    }
-    const cursor = paymentCollection.find(query);
-    const result = await cursor.toArray();
-    res.send(result);
+    app.get("/payments", verifyToken, async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      if (req.decoded.email !== email) {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+      const cursor = paymentCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
-  })
+    // app.get('/payments',async(req,res)=>{
+    //   const result = await paymentCollection.find().toArray();
+    //   res.send(result);
+    // })
 
-  // app.get('/payments',async(req,res)=>{
-  //   const result = await paymentCollection.find().toArray();
-  //   res.send(result);
-  // })
-
-  app.post('/payments',async(req,res)=>{
-      const payment=req.body;
-      const paymentResult=await paymentCollection.insertOne(payment);
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
       // carefully delete the cart after payment
-      const query = {_id:{
-        $in: payment.cartIds.map(id=>new ObjectId(id))
-      }}
+      const query = {
+        _id: {
+          $in: payment.cartIds.map((id) => new ObjectId(id)),
+        },
+      };
 
       const deleteResult = await cartCollection.deleteMany(query);
 
-      res.send({paymentResult,deleteResult});
-  })
+      res.send({ paymentResult, deleteResult });
+    });
 
+    // stats or analytics
 
+    app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
+      const users = await userCollection.estimatedDocumentCount();
+      const menuItems = await menuCollection.estimatedDocumentCount();
+      const orders = await paymentCollection.estimatedDocumentCount();
+
+      // not the best way
+      const payments = await paymentCollection.find().toArray();
+      // const revenue = payments.reduce((total,payment)=>total+=payment.price,0)
+
+      const result = await paymentCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalRevenue: {
+                $sum: "$price",
+              },
+            },
+          },
+        ])
+        .toArray();
+
+      const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+
+      res.send({
+        users,
+        menuItems,
+        orders,
+        payments,
+        revenue,
+      });
+    });
+
+    // using aggregate pipelines
+    app.get("/order-stats",async (req, res) => {
+      const result = await paymentCollection
+        .aggregate([
+          {
+            $unwind: "$menuIds",
+          },
+          {
+            $lookup: {
+              from: "menu",
+              localField: "menuIds",
+              foreignField: "_id",
+              as: "menuItems",
+            },
+          },
+          {
+            $unwind: "$menuItems",
+          },
+          {
+            $group: {
+              _id: "$menuItems.category",
+              quantity: {
+                $sum: 1,
+              },
+              revenue: { $sum: "$menuItems.price" },
+            },
+          },
+          {
+            $project:{
+              project: "$_id",
+              quantity: 1,
+              revenue: 1,
+              _id: 0,
+            }
+          }
+        ])
+        .toArray();
+
+      res.send(result);
+    });
 
     // create payment intent
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
-      console.log(amount,"inside the create payment intent");
+      console.log(amount, "inside the create payment intent");
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
