@@ -41,3 +41,4 @@ Thumbs.db
 *.rej
 *.sublime-project
 *.sublime-workspace
+.vercel

@@ -10,7 +10,11 @@ const port = process.env.PORT || 5000;
 
 // middleware
 
-app.use(cors());
+app.use(cors(
+  {
+    origin: ['https://bistro-boss12.web.app/,http://localhost:5173/']
+  }
+));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.y24v7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -98,7 +102,7 @@ async function run() {
     });
 
     // check if user is admin
-    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+    app.get("/users/admin/:email", verifyToken,verifyAdmin, async (req, res) => {
       const email = req.params.email;
       if (req.decoded.email !== email) {
         return res.status(403).send({ message: "Forbidden access" });
